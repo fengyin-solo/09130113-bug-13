@@ -34,6 +34,18 @@ export const fetchSeismicData = createAsyncThunk(
   }
 );
 
+export const fetchSeismicById = createAsyncThunk(
+  'seismic/fetchSeismicById',
+  async (id: number, { rejectWithValue }) => {
+    try {
+      const response = await seismicAPI.get(id);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || '未找到地震数据');
+    }
+  }
+);
+
 export const uploadSeismicData = createAsyncThunk(
   'seismic/uploadSeismicData',
   async (
@@ -82,6 +94,12 @@ const seismicSlice = createSlice({
     setCurrentSeismic: (state, action: PayloadAction<SeismicData | null>) => {
       state.currentSeismic = action.payload;
     },
+    removeSeismicByProject: (state, action: PayloadAction<number>) => {
+      state.seismicList = state.seismicList.filter((s) => s.project_id !== action.payload);
+      if (state.currentSeismic?.project_id === action.payload) {
+        state.currentSeismic = null;
+      }
+    },
     setUploadProgress: (state, action: PayloadAction<number>) => {
       state.uploadProgress = action.payload;
     },
@@ -112,6 +130,22 @@ const seismicSlice = createSlice({
         state.seismicList = action.payload;
       })
       .addCase(fetchSeismicData.rejected, (state, action: PayloadAction<any>) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(fetchSeismicById.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchSeismicById.fulfilled, (state, action: PayloadAction<SeismicData>) => {
+        state.loading = false;
+        state.currentSeismic = action.payload;
+        const index = state.seismicList.findIndex((s) => s.id === action.payload.id);
+        if (index !== -1) {
+          state.seismicList[index] = action.payload;
+        }
+      })
+      .addCase(fetchSeismicById.rejected, (state, action: PayloadAction<any>) => {
         state.loading = false;
         state.error = action.payload as string;
       })
@@ -147,6 +181,7 @@ export const {
   addAnnotation,
   updateAnnotation,
   removeAnnotation,
+  removeSeismicByProject,
   clearSeismicError,
 } = seismicSlice.actions;
 export default seismicSlice.reducer;

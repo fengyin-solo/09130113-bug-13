@@ -32,17 +32,34 @@ import {
   deleteProject,
   setCurrentProject,
 } from '../store/slices/projectSlice';
-import { fetchSeismicData, uploadSeismicData, setCurrentSeismic } from '../store/slices/seismicSlice';
+import { fetchSeismicData, uploadSeismicData, setCurrentSeismic, removeSeismicByProject } from '../store/slices/seismicSlice';
 import { RootState, AppDispatch } from '../store';
 import { Project, SeismicData } from '../types';
 
 const { Title, Text } = Typography;
+
+const getErrorMessage = (payload: any, fallback: string): string => {
+  const detail = payload?.detail ?? payload;
+  if (typeof detail === 'string' && detail) {
+    return detail;
+  }
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (first?.msg) {
+      const location = Array.isArray(first.loc) ? first.loc.slice(1).join('.') : '';
+      return location ? `${location}: ${first.msg}` : first.msg;
+    }
+  }
+  return fallback;
+};
 
 const Projects: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const [uploadForm] = Form.useForm();
   const navigate = useNavigate();
@@ -68,21 +85,47 @@ const Projects: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    const result = await dispatch(deleteProject(id));
-    if (deleteProject.fulfilled.match(result)) {
-      message.success('项目删除成功');
+    setDeletingId(id);
+    try {
+      const result = await dispatch(deleteProject(id));
+      if (deleteProject.fulfilled.match(result)) {
+        message.success('项目删除成功');
+        dispatch(removeSeismicByProject(id));
+        if (selectedProject?.id === id) {
+          setIsUploadModalOpen(false);
+          setSelectedProject(null);
+        }
+      } else {
+        message.error(getErrorMessage(result.payload, '项目删除失败'));
+      }
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleSubmit = async (values: any) => {
-    if (editingProject) {
-      await dispatch(updateProject({ id: editingProject.id, data: values }));
-      message.success('项目更新成功');
-    } else {
-      await dispatch(createProject(values));
-      message.success('项目创建成功');
+    setSubmitting(true);
+    try {
+      if (editingProject) {
+        const result = await dispatch(updateProject({ id: editingProject.id, data: values }));
+        if (updateProject.fulfilled.match(result)) {
+          message.success('项目更新成功');
+          setIsModalOpen(false);
+        } else {
+          message.error(getErrorMessage(result.payload, '项目更新失败'));
+        }
+      } else {
+        const result = await dispatch(createProject(values));
+        if (createProject.fulfilled.match(result)) {
+          message.success('项目创建成功');
+          setIsModalOpen(false);
+        } else {
+          message.error(getErrorMessage(result.payload, '创建项目失败'));
+        }
+      }
+    } finally {
+      setSubmitting(false);
     }
-    setIsModalOpen(false);
   };
 
   const handleOpenViewer = (seismic: SeismicData) => {
@@ -168,7 +211,7 @@ const Projects: React.FC = () => {
             okText="确定"
             cancelText="取消"
           >
-            <Button size="small" danger icon={<DeleteOutlined />}>
+            <Button size="small" danger icon={<DeleteOutlined />} loading={deletingId === record.id}>
               删除
             </Button>
           </Popconfirm>
@@ -283,7 +326,7 @@ const Projects: React.FC = () => {
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={submitting}>
                 保存
               </Button>
               <Button onClick={() => setIsModalOpen(false)}>取消</Button>
