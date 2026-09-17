@@ -32,9 +32,15 @@ class Project(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    members = relationship("ProjectMember", back_populates="project")
-    seismic_data = relationship("SeismicData", back_populates="project")
-    wells = relationship("Well", back_populates="project")
+    members = relationship(
+        "ProjectMember", back_populates="project", cascade="all, delete-orphan"
+    )
+    seismic_data = relationship(
+        "SeismicData", back_populates="project", cascade="all, delete-orphan"
+    )
+    wells = relationship(
+        "Well", back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class ProjectMember(Base):
@@ -90,8 +96,12 @@ class SeismicData(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     project = relationship("Project", back_populates="seismic_data")
-    annotations = relationship("Annotation", back_populates="seismic_data")
-    slices = relationship("SeismicSlice", back_populates="seismic_data")
+    annotations = relationship(
+        "Annotation", back_populates="seismic_data", cascade="all, delete-orphan"
+    )
+    slices = relationship(
+        "SeismicSlice", back_populates="seismic_data", cascade="all, delete-orphan"
+    )
 
 
 class SeismicSlice(Base):
@@ -124,7 +134,9 @@ class Well(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     project = relationship("Project", back_populates="wells")
-    well_logs = relationship("WellLog", back_populates="well")
+    well_logs = relationship(
+        "WellLog", back_populates="well", cascade="all, delete-orphan"
+    )
 
 
 class WellLog(Base):

@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { projectsAPI } from '../../services/api';
 import { Project, ProjectMember } from '../../types';
+import { clearSeismicForProject } from './seismicSlice';
 
 interface ProjectState {
   projects: Project[];
@@ -48,14 +49,18 @@ export const updateProject = createAsyncThunk(
   }
 );
 
-export const deleteProject = createAsyncThunk('projects/deleteProject', async (id: number, { rejectWithValue }) => {
-  try {
-    await projectsAPI.delete(id);
-    return id;
-  } catch (error: any) {
-    return rejectWithValue(error.response?.data?.detail || '删除项目失败');
+export const deleteProject = createAsyncThunk(
+  'projects/deleteProject',
+  async (id: number, { rejectWithValue, dispatch }) => {
+    try {
+      await projectsAPI.delete(id);
+      dispatch(clearSeismicForProject(id));
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || '删除项目失败');
+    }
   }
-});
+);
 
 export const fetchProjectMembers = createAsyncThunk(
   'projects/fetchProjectMembers',

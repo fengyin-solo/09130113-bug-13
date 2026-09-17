@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Button, Spin, message, Space, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { RootState, AppDispatch } from '../store';
-import { fetchSeismicData, setCurrentSeismic } from '../store/slices/seismicSlice';
+import { fetchSeismicById } from '../store/slices/seismicSlice';
 import { SeismicData } from '../types';
 import SeismicCanvas from '../components/SeismicCanvas';
 import ControlPanel from '../components/ControlPanel';
@@ -19,26 +19,35 @@ const Viewer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { seismicList, loading } = useSelector((state: RootState) => state.seismic);
+  const { loading } = useSelector((state: RootState) => state.seismic);
   const [currentData, setCurrentData] = useState<SeismicData | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      const id = parseInt(seismicId || '0');
-      if (!id) return;
+    let active = true;
+    const id = parseInt(seismicId || '0');
 
-      const existing = seismicList.find((s) => s.id === id);
-      if (existing) {
-        setCurrentData(existing);
-        dispatch(setCurrentSeismic(existing));
+    if (!id) {
+      message.error('未找到地震数据');
+      navigate('/projects');
+      return;
+    }
+
+    // 始终从服务端重新获取，避免项目删除后缓存中的记录残留
+    dispatch(fetchSeismicById(id)).then((result) => {
+      if (!active) return;
+      if (fetchSeismicById.fulfilled.match(result)) {
+        setCurrentData(result.payload);
       } else {
+        setCurrentData(null);
         message.error('未找到地震数据');
         navigate('/projects');
       }
-    };
+    });
 
-    loadData();
-  }, [seismicId, seismicList, dispatch, navigate]);
+    return () => {
+      active = false;
+    };
+  }, [seismicId, dispatch, navigate]);
 
   if (loading || !currentData) {
     return (

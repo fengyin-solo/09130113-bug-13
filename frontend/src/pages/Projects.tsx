@@ -43,6 +43,7 @@ const Projects: React.FC = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const [uploadForm] = Form.useForm();
   const navigate = useNavigate();
@@ -67,22 +68,46 @@ const Projects: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const getErrorMessage = (result: any, fallback: string) => {
+    const detail = result?.payload;
+    return typeof detail === 'string' && detail ? detail : fallback;
+  };
+
   const handleDelete = async (id: number) => {
     const result = await dispatch(deleteProject(id));
     if (deleteProject.fulfilled.match(result)) {
       message.success('项目删除成功');
+      if (selectedProject?.id === id) {
+        setSelectedProject(null);
+        setIsUploadModalOpen(false);
+      }
+    } else {
+      message.error(getErrorMessage(result, '项目删除失败，请稍后重试'));
     }
   };
 
   const handleSubmit = async (values: any) => {
-    if (editingProject) {
-      await dispatch(updateProject({ id: editingProject.id, data: values }));
-      message.success('项目更新成功');
-    } else {
-      await dispatch(createProject(values));
-      message.success('项目创建成功');
+    setSubmitting(true);
+    try {
+      if (editingProject) {
+        const result = await dispatch(updateProject({ id: editingProject.id, data: values }));
+        if (!updateProject.fulfilled.match(result)) {
+          message.error(getErrorMessage(result, '项目更新失败，请稍后重试'));
+          return;
+        }
+        message.success('项目更新成功');
+      } else {
+        const result = await dispatch(createProject(values));
+        if (!createProject.fulfilled.match(result)) {
+          message.error(getErrorMessage(result, '项目创建失败，请稍后重试'));
+          return;
+        }
+        message.success('项目创建成功');
+      }
+      setIsModalOpen(false);
+    } finally {
+      setSubmitting(false);
     }
-    setIsModalOpen(false);
   };
 
   const handleOpenViewer = (seismic: SeismicData) => {
@@ -283,7 +308,7 @@ const Projects: React.FC = () => {
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={submitting}>
                 保存
               </Button>
               <Button onClick={() => setIsModalOpen(false)}>取消</Button>
